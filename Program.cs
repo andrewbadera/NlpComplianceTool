@@ -8,6 +8,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using ComplianceCheck;
 
@@ -24,8 +25,14 @@ class Program
             .Build();
 
         // Set up dependency injection
-        var services = new ServiceCollection()
+        await using var services = new ServiceCollection()
             .AddSingleton<IConfiguration>(configuration)
+            .AddLogging(builder =>
+            {
+                builder.AddConfiguration(configuration.GetSection("Logging"));
+                builder.AddConsole();
+                builder.AddDebug();
+            })
             .AddScoped<ComplianceChecker>()
             .BuildServiceProvider();
 

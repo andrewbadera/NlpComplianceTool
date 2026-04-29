@@ -6,34 +6,52 @@ using Azure.Search.Documents.Indexes;
 using OpenAI.Chat;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace ComplianceCheck
 {
     internal class ComplianceChecker
     {
         private readonly IConfiguration _configuration;
+        private ILogger<ComplianceChecker> _logger;
 
-        public ComplianceChecker(IConfiguration configuration)
+        public ComplianceChecker(IConfiguration configuration, ILogger<ComplianceChecker> logger)
         {
             _configuration = configuration;
+            _logger = logger;
         }
         public async Task CheckCompliance()
         {
-            string aisearchUrl = _configuration["AzureSearch:Url"];
+            string aisearchUrl = _configuration["AzureSearch:Url"];            
             string aisearchKey = _configuration["AzureSearch:ApiKey"];
+            string searchIndex = _configuration["AzureSearch:MultimodalIndex"];
 
-            var endpoint = new Uri(_configuration["AzureOpenAI:Endpoint"]);
+            _logger.LogDebug($"Azure Search URL: {aisearchUrl}");
+            _logger.LogDebug($"AI Search Index: {searchIndex}");
+            
+            _logger.LogDebug($"AI Search API Key Default: " +
+                $"{aisearchKey == "{aiSearchKey}"}");
+
+            _logger.LogDebug($"Azure Search Index: {searchIndex}");
+
+            var endpoint = _configuration["AzureOpenAI:Endpoint"];
+            _logger.LogDebug($"Foundry Endpoint: {endpoint}");
+            
             var deploymentName = _configuration["AzureOpenAI:DeploymentName"];
+            _logger.LogDebug($"Foundry Deployment Name: {deploymentName}");
+            
             var apiKey = _configuration["AzureOpenAI:ApiKey"];
+            _logger.LogDebug($"Foundry API Key Default: {apiKey == "{openApiKey}"}");
+
+            var endpointUri = new Uri(endpoint);
 
             AzureOpenAIClient azureClient = new(
-                endpoint,
+                endpointUri,
                 new AzureKeyCredential(apiKey));
             ChatClient chatClient = azureClient.GetChatClient(deploymentName);
 
             string searchEndpoint = aisearchUrl;
-            string searchIndex = _configuration["AzureSearch:MultimodalIndex"];
-
+            
 
             var webpageSearchClient = new SearchClient(
                 new Uri(aisearchUrl),

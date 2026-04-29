@@ -25,6 +25,7 @@ namespace ComplianceCheck
             string aisearchUrl = _configuration["AzureSearch:Url"];            
             string aisearchKey = _configuration["AzureSearch:ApiKey"];
             string searchIndex = _configuration["AzureSearch:MultimodalIndex"];
+            string webPageIndex = _configuration["AzureSearch:WebpageIndex"];
 
             _logger.LogDebug($"Azure Search URL: {aisearchUrl}");
             _logger.LogDebug($"AI Search Index: {searchIndex}");
@@ -32,7 +33,9 @@ namespace ComplianceCheck
             _logger.LogDebug($"AI Search API Key Default: " +
                 $"{aisearchKey == "{aiSearchKey}"}");
 
-            _logger.LogDebug($"Azure Search Index: {searchIndex}");
+            _logger.LogDebug($"AI Search Criteria Index: {searchIndex}");
+
+            _logger.LogDebug($"AI Search Webpage Index: {webPageIndex}");
 
             var endpoint = _configuration["AzureOpenAI:Endpoint"];
             _logger.LogDebug($"Foundry Endpoint: {endpoint}");
@@ -50,12 +53,11 @@ namespace ComplianceCheck
                 new AzureKeyCredential(apiKey));
             ChatClient chatClient = azureClient.GetChatClient(deploymentName);
 
-            string searchEndpoint = aisearchUrl;
-            
+            string searchEndpoint = aisearchUrl;            
 
             var webpageSearchClient = new SearchClient(
                 new Uri(aisearchUrl),
-                _configuration["AzureSearch:WebpageIndex"],
+                webPageIndex,
                 new Azure.AzureKeyCredential(aisearchKey));
 
             var webpageCount = webpageSearchClient.GetDocumentCount().Value;

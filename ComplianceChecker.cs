@@ -60,36 +60,51 @@ namespace ComplianceCheck
                 webPageIndex,
                 new Azure.AzureKeyCredential(aisearchKey));
 
-            var webpageCount = webpageSearchClient.GetDocumentCount().Value;
+            if (webpageSearchClient == null)    
+            {
+                _logger.LogError("Failed to create webpageSearchClient.");
+                return;
+            }
 
             var allWebpages = new ConcurrentBag<SearchDocumentModel>();
 
-            while (webpageCount > 0)
+            try
             {
-                var webpageResults = webpageSearchClient.Search<SearchDocumentModel>("*", new SearchOptions
+                var webpageCount = webpageSearchClient.GetDocumentCount().Value;
+               
+                while (webpageCount > 0)
                 {
-                    Size = 1000
-                });
+                    var webpageResults = webpageSearchClient.Search<SearchDocumentModel>("*", new SearchOptions
+                    {
+                        Size = 1000
+                    });
 
-                foreach (var result in webpageResults.Value.GetResults())
-                {
-                    var doc = result.Document;
-                    if (doc != null)
+                    foreach (var result in webpageResults.Value.GetResults())
                     {
-                        allWebpages.Add(doc);
-                        Console.WriteLine($"Retrieved webpage: {doc.title}");
+                        var doc = result.Document;
+                        if (doc != null)
+                        {
+                            allWebpages.Add(doc);
+                            _logger.LogInformation($"Retrieved webpage: {doc.title}");
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Document is null.");
+                        }
                     }
-                    else
-                    {
-                        Console.WriteLine("Document is null.");
-                    }
+
+                    webpageCount -= 1000;
                 }
-
-                webpageCount -= 1000;
+            } catch (Exception ex) {
+                _logger.LogError(ex, "Failed to get document count from webpageSearchClient.");
+                return;
             }
 
+            ChatCompletionOptions options;
+
+            try { 
 #pragma warning disable AOAI001 // Suppress the diagnostic warning
-            ChatCompletionOptions options = new ChatCompletionOptions()
+            options = new ChatCompletionOptions()
             {
                 TopP = float.Parse(_configuration["ChatCompletion:TopP"]),
                 Temperature = float.Parse(_configuration["ChatCompletion:Temperature"]),
@@ -104,6 +119,11 @@ namespace ComplianceCheck
                 MaxSearchQueries = int.Parse(_configuration["ChatCompletion:MaxSearchQueries"]),
                 TopNDocuments = int.Parse(_configuration["ChatCompletion:TopNDocuments"]),
             });
+            } catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to set up ChatCompletionOptions.");
+                return;
+            }
 
             var complianceResults = new ConcurrentBag<ComplianceResult>();
             var errorDict = new ConcurrentDictionary<string, string>();
@@ -141,7 +161,7 @@ namespace ComplianceCheck
                             {
                                 if (retryCount < maxRetries)
                                 {
-                                    Console.WriteLine($"Retry after 1 second for {webpageDoc.title}");
+                                    _logger.LogWarning(retryEx, $"Retry after 1 second for {webpageDoc.title}");
                                     await Task.Delay(delayMs);
                                     retryCount++;
                                 }
@@ -154,13 +174,19 @@ namespace ComplianceCheck
                     } catch (Exception ex)
                     {
                         errorDict.AddOrUpdate(webpageDoc.title, $"\"ChatCompletionEx|{userMessage}\"", (k, k0) => k);
-                        Console.WriteLine($"errored: {webpageDoc.title} - \"{ex.Message}\"");
+                        _logger.LogError(ex, $"errored: {webpageDoc.title} - \"{ex.Message}\"");
                         continue;
                     }
 
                     var resultJson = completion.Content[0].Text.Trim();
+                    if (resultJson == null )
+                    {
+                        errorDict.AddOrUpdate(webpageDoc.title, $"\"NullResult|{userMessage}\"", (k, k0) => k);
+                        _logger.LogError($"Null result for: {webpageDoc.title}");
+                        continue;
+                    }
 
-                    Console.WriteLine("AI Response:\n" + resultJson);
+                    _logger.LogInformation("AI Response:\n" + resultJson);
 
                     try
                     {
@@ -171,18 +197,18 @@ namespace ComplianceCheck
                         result.Title = $"\"{result.Title}\"";
                         result.Reason = $"\"{result.Reason}\"";
                         complianceResults.Add(result);
-                        Console.WriteLine($"processed: {webpageDoc.title}");
+                        _logger.LogInformation($"processed: {webpageDoc.title}");
                     }
                     catch (Exception ex)
                     {
                         errorDict.AddOrUpdate($"{webpageDoc.title}", $"\"Therequestedinfo|{userMessage}\"", (k, k0) => k);
-                        Console.WriteLine($"errored: ${webpageDoc.title}");
+                        _logger.LogError(ex, $"errored: ${webpageDoc.title}");
                     }
                 }
                 catch (Exception ex)
                 {
                     errorDict.AddOrUpdate(webpageDoc.title, $"\"OtherEx|{userMessage}\"", (k, k0) => k);
-                    Console.WriteLine($"errored: {webpageDoc.title} - \"{ex.Message}\"");
+                    _logger.LogError(ex, $"errored: {webpageDoc.title} - \"{ex.Message}\"");
                 }
             }
 
@@ -198,7 +224,7 @@ namespace ComplianceCheck
                 }
             }
 
-            Console.WriteLine($"Number of documents producing errors: {errorDict.Count}");
+            _logger.LogInformation($"Number of documents producing errors: {errorDict.Count}");
             using (var writer = new StreamWriter("errordocs.csv"))
             {
                 writer.WriteLine("Filename,Content");

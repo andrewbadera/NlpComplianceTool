@@ -24,6 +24,9 @@ class Program
             .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
             .Build();
 
+        // Resolve the log file path from configuration (defaults to "log.txt").
+        var logFilePath = configuration["Logging:File"] ?? "log.txt";
+
         // Set up dependency injection
         await using var services = new ServiceCollection()
             .AddSingleton<IConfiguration>(configuration)
@@ -32,20 +35,24 @@ class Program
                 builder.AddConfiguration(configuration.GetSection("Logging"));
                 builder.AddConsole();
                 builder.AddDebug();
+                builder.AddProvider(new FileLoggerProvider(logFilePath));
             })
             .AddScoped<ComplianceChecker>()
             .BuildServiceProvider();
 
+        var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger<Program>();
+
         var program = new Program();
         await program.CheckCompliance(args, services);
         stopwatch.Stop();
-        Console.WriteLine($"Execution Time: {stopwatch.Elapsed.TotalMinutes} minutes");
+        logger.LogInformation($"Execution Time: {stopwatch.Elapsed.TotalMinutes} minutes");
     }
     public async Task CheckCompliance(string[] args, IServiceProvider serviceProvider)
     {
         var complianceChecker = serviceProvider.GetRequiredService<ComplianceChecker>();
         await complianceChecker.CheckCompliance();
 
-        Console.WriteLine("Compliance check completed. Press any key to exit.");
+        var logger = serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<Program>();
+        logger.LogInformation("Compliance check completed. Press any key to exit.");
     }
 }

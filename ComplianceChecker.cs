@@ -127,12 +127,25 @@ namespace ComplianceCheck
 
             var complianceResults = new ConcurrentBag<ComplianceResult>();
             var errorDict = new ConcurrentDictionary<string, string>();
-            
+
+            var systemMessage = System.IO.File.ReadAllText("SystemMessage.txt");
+
             foreach (var webpageDoc in allWebpages)
             {
-                // read contents of SystemMessage.txt
-                var systemMessage = System.IO.File.ReadAllText("SystemMessage.txt");
-                var userMessage = webpageDoc.content.Trim();
+                // read contents of SystemMessage.txt              
+                var userMessage = "PDF had no content";
+                if (webpageDoc != null &&
+                    !string.IsNullOrEmpty(webpageDoc.content))
+                {
+                    userMessage = webpageDoc.content.Trim();
+                }
+                else
+                {
+                    errorDict.AddOrUpdate(webpageDoc.title, $"\"NoContent|{userMessage}\"", (k, k0) => k);
+                    _logger.LogError($"No content for: {webpageDoc.title}");
+                    continue;
+                }
+
                 List<ChatMessage> messages = new List<ChatMessage>();
                 messages.Add(new SystemChatMessage(systemMessage));
 
@@ -161,7 +174,7 @@ namespace ComplianceCheck
                             {
                                 if (retryCount < maxRetries)
                                 {
-                                    _logger.LogWarning(retryEx, $"Retry after 1 second for {webpageDoc.title}");
+                                    _logger.LogWarning(retryEx, $"Retry after {delayMs}ms for {webpageDoc.title}");
                                     await Task.Delay(delayMs);
                                     retryCount++;
                                 }

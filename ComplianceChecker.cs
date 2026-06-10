@@ -130,7 +130,9 @@ namespace ComplianceCheck
 
             var systemMessage = System.IO.File.ReadAllText("SystemMessage.txt");
 
-            foreach (var webpageDoc in allWebpages)
+            var validWebpages = allWebpages.Where(doc => doc != null).ToList();
+
+            foreach (var webpageDoc in validWebpages)
             {
                 // read contents of SystemMessage.txt              
                 var userMessage = "PDF had no content";

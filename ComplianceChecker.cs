@@ -70,16 +70,24 @@ namespace ComplianceCheck
 
             try
             {
-                var webpageCount = webpageSearchClient.GetDocumentCount().Value;
+                
                
-                while (webpageCount > 0)
-                {
+                //while (webpageCount > 0)
+                //{
                     var webpageResults = webpageSearchClient.Search<SearchDocumentModel>("*", new SearchOptions
                     {
                         Size = 1000
                     });
 
-                    foreach (var result in webpageResults.Value.GetResults())
+                    var uniqueTitles = webpageResults.Value.GetResults().DistinctBy(w => w.Document.title).ToList();
+
+                    var webpageCount = uniqueTitles.Count;
+
+                    var allResults = webpageResults.Value.GetResults();
+
+                    var resultsByTitle = allResults.GroupBy(r => r.Document.title);
+
+                    foreach (var result in allResults)
                     {
                         var doc = result.Document;
                         if (doc != null)
@@ -94,7 +102,7 @@ namespace ComplianceCheck
                     }
 
                     webpageCount -= 1000;
-                }
+                //}
             } catch (Exception ex) {
                 _logger.LogError(ex, "Failed to get document count from webpageSearchClient.");
                 return;
@@ -128,13 +136,13 @@ namespace ComplianceCheck
             var complianceResults = new ConcurrentBag<ComplianceResult>();
             var errorDict = new ConcurrentDictionary<string, string>();
 
+            // read contents of SystemMessage.txt
             var systemMessage = System.IO.File.ReadAllText("SystemMessage.txt");
 
             var validWebpages = allWebpages.Where(doc => doc != null).ToList();
 
             foreach (var webpageDoc in validWebpages)
-            {
-                // read contents of SystemMessage.txt              
+            {             
                 var userMessage = "PDF had no content";
                 if (webpageDoc != null &&
                     !string.IsNullOrEmpty(webpageDoc.content))
@@ -143,9 +151,9 @@ namespace ComplianceCheck
                 }
                 else
                 {
-                    errorDict.AddOrUpdate(webpageDoc.title, $"\"NoContent|{userMessage}\"", (k, k0) => k);
-                    _logger.LogError($"No content for: {webpageDoc.title}");
-                    continue;
+                    errorDict.AddOrUpdate($"\"NoContent|\"", $"\"{userMessage}\"", (k, k0) => k);
+                    _logger.LogError($"No content for: {userMessage}");
+                    break;
                 }
 
                 List<ChatMessage> messages = new List<ChatMessage>();
@@ -188,8 +196,8 @@ namespace ComplianceCheck
                         }
                     } catch (Exception ex)
                     {
-                        errorDict.AddOrUpdate(webpageDoc.title, $"\"ChatCompletionEx|{userMessage}\"", (k, k0) => k);
-                        _logger.LogError(ex, $"errored: {webpageDoc.title} - \"{ex.Message}\"");
+                        errorDict.AddOrUpdate($"\"NoContent|\"", $"\"{userMessage}\"", (k, k0) => k);
+                        _logger.LogError($"No content for: {userMessage}");
                         continue;
                     }
 

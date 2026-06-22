@@ -21,7 +21,8 @@ class Program
         // Build configuration
         var configuration = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
-            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+            .AddJsonFile("appsettings.development.json", optional: false, reloadOnChange: true)
+            //.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
             .Build();
 
         // Resolve the log file path from configuration (defaults to "log.txt").
@@ -46,6 +47,8 @@ class Program
         await program.CheckCompliance(args, services);
         stopwatch.Stop();
         logger.LogInformation($"Execution Time: {stopwatch.Elapsed.TotalMinutes} minutes");
+
+        Console.ReadLine();
     }
     public async Task CheckCompliance(string[] args, IServiceProvider serviceProvider)
     {

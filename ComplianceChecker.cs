@@ -75,8 +75,6 @@ namespace ComplianceCheck
 
             var uniqueTitles = webpageResults.Value.GetResults().DistinctBy(w => w.Document.document_title).ToList();
 
-            var webpageCount = uniqueTitles.Count;
-
             var allResults = webpageResults.Value.GetResults();
 
             var resultsByTitle = allResults.GroupBy(r => r.Document.document_title);
@@ -94,8 +92,6 @@ namespace ComplianceCheck
                     _logger.LogWarning("Document is null.");
                 }
             }
-
-            webpageCount -= 1000;
 
             ChatCompletionOptions options;
 
@@ -127,7 +123,6 @@ namespace ComplianceCheck
             var complianceResults = new ConcurrentBag<ComplianceResult>();
             var errorDict = new ConcurrentDictionary<string, string>();
 
-            // read contents of SystemMessage.txt
             var systemMessage = System.IO.File.ReadAllText("SystemMessage.txt");
 
             int maxRetries = int.Parse(_configuration["Retry:MaxRetries"]);
@@ -135,12 +130,11 @@ namespace ComplianceCheck
 
             var validWebpages = allWebpages.Where(doc => doc != null).ToList();
 
-            string lastMessage = "";
             string currentMessage = "";
-            string userMessage = "";
-            var uniqueDocs = validWebpages.Select(doc => doc).Distinct().ToList();
+            var uniqueDocs = validWebpages.Select(doc => doc).DistinctBy(doc => doc.document_title).ToList();
             foreach (var title in uniqueDocs)
             {
+                currentMessage = "";
                 var allContent = validWebpages.Where(doc => doc.document_title == title.document_title).ToList();
                 foreach (var content in allContent)
                 {
@@ -158,7 +152,7 @@ namespace ComplianceCheck
                 var resultJson = completion.Content[0].Text.Trim();
                 if (resultJson == null)
                 {
-                    errorDict.AddOrUpdate(title.document_title, $"\"NullResult|{userMessage}\"", (k, k0) => k);
+                    errorDict.AddOrUpdate(title.document_title, $"\"NullResult|{currentMessage}\"", (k, k0) => k);
                     _logger.LogError($"Null result for: {title.document_title}");
                     continue;
                 }
@@ -178,7 +172,7 @@ namespace ComplianceCheck
                 }
                 catch (Exception ex)
                 {
-                    errorDict.AddOrUpdate($"{title.document_title}", $"\"Therequestedinfo|{userMessage}\"", (k, k0) => k);
+                    errorDict.AddOrUpdate($"{title.document_title}", $"\"Therequestedinfo|{currentMessage}\"", (k, k0) => k);
                     _logger.LogError(ex, $"errored: ${title.document_title}");
                 }
             }
@@ -204,7 +198,6 @@ namespace ComplianceCheck
                     writer.WriteLine($"{record.Key},{record.Value}");
                 }
             }
-
 
             return;
         }

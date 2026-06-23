@@ -6,8 +6,8 @@
 
     public class SearchDocumentModel
     {
-        public string title { get; set; }
+        public string document_title { get; set; }
       
-        public string content { get; set; }
+        public string content_text { get; set; }
     }
 }
